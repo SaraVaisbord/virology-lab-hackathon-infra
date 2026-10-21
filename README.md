@@ -6,16 +6,16 @@ Terraform שמקים את כל התשתית להרצת [virology-lab-hackathon-a
 
 | רכיב | פירוט | קובץ |
 |---|---|---|
-| רשת (VPC) | תתי-רשת ציבוריות לאשכול, ותתי-רשת **פרטיות בלי גישה לאינטרנט** למסד הנתונים | `modules/network` |
+| רשת (VPC) | תתי-רשת ציבוריות לאשכול (מתויגות `kubernetes.io/role/elb`, כדי שה-ALB יוכל לשבת עליהן), ותתי-רשת **פרטיות בלי גישה לאינטרנט** למסד הנתונים | `modules/network` |
 | אשכול EKS | Kubernetes 1.31, 2 שרתים (`m7i-flex.large` – מותר גם בתוכנית החינמית של AWS) | `MAIN.tf` |
 | תוספים | EBS CSI (דיסקים מוצפנים), Load Balancer Controller, External Secrets | `MAIN.tf` |
-| **מסד נתונים** | **RDS PostgreSQL 16 – שרת נפרד**, בתת-רשת פרטית, נגיש רק מהאשכול, מוצפן. גיבוי אוטומטי יומי ל-7 ימים + שחזור לכל רגע בתקופה, snapshot סופי במחיקה, הגנה ממחיקה. אופציה: שרת גיבוי חם באזור אחר (`db_multi_az`) | `app.tf` |
+| **מסד נתונים** | **RDS PostgreSQL 16 – שרת נפרד**, בתת-רשת פרטית, נגיש רק מהאשכול, מוצפן. גיבוי אוטומטי של RDS ליום אחד (המקסימום בתוכנית החינמית) + שחזור לכל רגע בתקופה, ו-7 ימים דרך AWS Backup, snapshot סופי במחיקה, הגנה ממחיקה. אופציה: שרת גיבוי חם באזור אחר (`db_multi_az`) | `app.tf` |
 | **קבצים ותמונות** | **באקט S3 פרטי** – חסום לגישה ציבורית, מוצפן, גרסאות (אפשר לשחזר קובץ שנמחק), רק HTTPS | `app.tf` |
 | הרשאות | ל-backend יש IAM role (IRSA) שמורשה **רק** לבאקט הזה | `app.tf` |
 | תמונות האפליקציה | שני מאגרי ECR (backend, frontend), סריקת אבטחה בכל דחיפה | `app.tf` |
 | סודות | Secrets Manager: חיבור למסד (נוצר אוטומטית) ומפתחות Gemini (מוכנסים ידנית) | `app.tf` |
 | גיבוי נוסף | AWS Backup – גיבוי יומי ל-7 ימים של כל המשאבים המתויגים | `backup.tf` |
-| מצב Terraform | S3 + נעילה ב-DynamoDB, במפתח נפרד מכל תשתית אחרת | `backend.hcl` |
+| מצב Terraform | S3, עם נעילה בתוך S3 (`use_lockfile`, בלי טבלת DynamoDB), במפתח נפרד מכל תשתית אחרת | `backend.hcl` |
 
 ## הרצה
 
@@ -53,7 +53,13 @@ aws secretsmanager put-secret-value --secret-id virology-lab-forms-validation/ge
 
 ## פירוק
 
-המסד מוגן ממחיקה והבאקט לא נמחק כשיש בו קבצים. כדי לפרק הכול: `db_deletion_protection = false` ו-`files_bucket_force_destroy = true`, `terraform apply`, ואז `terraform destroy`. במחיקה נשמר snapshot סופי של המסד.
+המסד מוגן ממחיקה והבאקט לא נמחק כשיש בו קבצים. כדי לפרק הכול:
+
+1. **קודם האפליקציה:** `kubectl delete namespace virology-lab`. ה-ALB נוצר מתוך Kubernetes ולא ב-Terraform, ואם לא מוחקים אותו קודם הוא נשאר יתום וחוסם את מחיקת ה-VPC.
+2. ב-`terraform.tfvars`: `db_deletion_protection = false` ו-`files_bucket_force_destroy = true`, ואז `terraform apply`.
+3. `terraform destroy`.
+
+במחיקה נשמר snapshot סופי של המסד (`virology-lab-forms-validation-db-final`). באקט המצב של Terraform (`backend.hcl`) לא נמחק, כי הוא לא חלק מהתשתית שהקוד מנהל.
 
 ## עלות משוערת (us-east-1)
 
