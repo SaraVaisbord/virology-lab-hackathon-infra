@@ -7,7 +7,7 @@ Terraform שמקים את כל התשתית להרצת [virology-lab-hackathon-a
 | רכיב | פירוט | קובץ |
 |---|---|---|
 | רשת (VPC) | תתי-רשת ציבוריות לאשכול, ותתי-רשת **פרטיות בלי גישה לאינטרנט** למסד הנתונים | `modules/network` |
-| אשכול EKS | Kubernetes 1.31, 2 שרתים (`t3a.large`, אפשר 1–3) | `MAIN.tf` |
+| אשכול EKS | Kubernetes 1.31, 2 שרתים (`m7i-flex.large` – מותר גם בתוכנית החינמית של AWS) | `MAIN.tf` |
 | תוספים | EBS CSI (דיסקים מוצפנים), Load Balancer Controller, External Secrets | `MAIN.tf` |
 | **מסד נתונים** | **RDS PostgreSQL 16 – שרת נפרד**, בתת-רשת פרטית, נגיש רק מהאשכול, מוצפן. גיבוי אוטומטי יומי ל-7 ימים + שחזור לכל רגע בתקופה, snapshot סופי במחיקה, הגנה ממחיקה. אופציה: שרת גיבוי חם באזור אחר (`db_multi_az`) | `app.tf` |
 | **קבצים ותמונות** | **באקט S3 פרטי** – חסום לגישה ציבורית, מוצפן, גרסאות (אפשר לשחזר קובץ שנמחק), רק HTTPS | `app.tf` |
@@ -39,7 +39,7 @@ region          = "us-east-1"
 vpc_cidrs       = "10.0.0.0/16"
 ha              = 2
 cluster_version = "1.31"
-node_type       = "t3a.large"
+node_type       = "m7i-flex.large"
 ```
 
 אחרי ההקמה – מפתחות Gemini לסוד (הערכים לא עוברים דרך Terraform או Git):

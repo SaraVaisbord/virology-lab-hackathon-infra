@@ -37,6 +37,12 @@ variable "db_instance_class" {
   default = "db.t4g.micro"
 }
 
+variable "db_backup_retention_days" {
+  description = "RDS automatic backups (point-in-time restore window). AWS free-plan accounts allow only 1 day; 7 on a paid plan."
+  type        = number
+  default     = 1
+}
+
 variable "db_multi_az" {
   description = "A standby database server in another zone that takes over automatically (doubles the DB cost)"
   type        = bool

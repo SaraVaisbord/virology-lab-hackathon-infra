@@ -173,8 +173,9 @@ resource "aws_db_instance" "app" {
   publicly_accessible    = false
   multi_az               = var.db_multi_az # true = a standby server takes over automatically if the main one fails
 
-  # Daily automatic backups kept 7 days, and restore to any second in that window.
-  backup_retention_period   = 7
+  # Daily automatic backups + restore to any second in that window. AWS Backup (backup.tf) also keeps a daily
+  # snapshot of this database for 7 days, independently of this setting.
+  backup_retention_period   = var.db_backup_retention_days
   backup_window             = "00:00-01:00"
   maintenance_window        = "sun:01:30-sun:02:30"
   copy_tags_to_snapshot     = true
@@ -182,6 +183,11 @@ resource "aws_db_instance" "app" {
   final_snapshot_identifier = "${local.name_prefix}-db-final"
   deletion_protection       = var.db_deletion_protection
   apply_immediately         = true
+
+  lifecycle {
+    # "16" means the latest 16.x; AWS applies minor upgrades itself (16.13 → 16.14), which is not a change to undo.
+    ignore_changes = [engine_version]
+  }
 }
 
 ####### Secrets Manager (names under "<prefix>/" — the only ones External Secrets may read) #######
