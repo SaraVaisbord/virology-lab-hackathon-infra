@@ -46,7 +46,8 @@ resource "aws_subnet" "this" {
   cidr_block              = cidrsubnet(var.vpc_cidrs, 8, count.index)
   availability_zone       = data.aws_availability_zones.available.names[count.index]
   tags = {
-    Name = "${var.name_prefix}-SUBNET-${count.index}"
+    Name                     = "${var.name_prefix}-SUBNET-${count.index}"
+    "kubernetes.io/role/elb" = "1" # where the AWS Load Balancer Controller places internet-facing ALBs
   }
 }
 
