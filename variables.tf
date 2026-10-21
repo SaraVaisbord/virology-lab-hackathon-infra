@@ -12,24 +12,61 @@ variable "vpc_cidrs" {
 
 variable "common_tags" {
   default = {
-    owner           = "terraform-eks"
-    managedBy       = "terraform"
-    usage           = "training"
-    app_name        = "PeopleManagement"
+    owner     = "virology-lab"
+    managedBy = "terraform"
+    usage     = "hackathon"
+    app_name  = "forms-validation"
   }
 }
 
 variable "region" {
+  type    = string
+  default = "us-east-1"
+}
+
+# ── the forms-validation app (app.tf) ──
+
+variable "app_namespace" {
+  description = "Kubernetes namespace of the app (the backend's IAM role is bound to its service account there)"
   type        = string
-  default     = "us-east-2"
+  default     = "virology-lab"
+}
+
+variable "db_instance_class" {
+  type    = string
+  default = "db.t4g.micro"
+}
+
+variable "db_multi_az" {
+  description = "A standby database server in another zone that takes over automatically (doubles the DB cost)"
+  type        = bool
+  default     = false
+}
+
+variable "db_deletion_protection" {
+  description = "Refuse to delete the database (set false only to tear the environment down)"
+  type        = bool
+  default     = true
+}
+
+variable "files_bucket_force_destroy" {
+  description = "Allow 'terraform destroy' to delete the files bucket even when it still holds files"
+  type        = bool
+  default     = false
+}
+
+variable "enable_github_actions_access" {
+  description = "Give the GitHub Actions role cluster-admin access (the role must already exist)"
+  type        = bool
+  default     = false
 }
 
 variable "cluster_version" {
-    type      = string
+  type = string
 }
 
 variable "node_type" {
-  type        = string
+  type = string
 }
 
 variable "github_actions_role_name" {

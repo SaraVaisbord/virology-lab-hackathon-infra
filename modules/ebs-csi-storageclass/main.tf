@@ -29,8 +29,8 @@ resource "kubernetes_storage_class_v1" "gp3" {
   volume_binding_mode    = "WaitForFirstConsumer"
 
   parameters = {
-    # encrypted = true
-    "csi.storage.k8s.io/fstype"   = "ext4"
-    type      = "gp3"
+    encrypted                   = "true"
+    "csi.storage.k8s.io/fstype" = "ext4"
+    type                        = "gp3"
   }
 }

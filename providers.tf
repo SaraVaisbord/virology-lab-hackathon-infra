@@ -12,15 +12,19 @@ terraform {
       source  = "hashicorp/helm"
       version = "~> 2.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
   }
-  
+
 
 }
 data "aws_eks_cluster" "cluster" {
   name = module.eks.cluster_name
 }
 provider "aws" {
-  region  = var.region
+  region = var.region
 
   default_tags {
     tags = var.common_tags

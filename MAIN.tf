@@ -1,33 +1,33 @@
 data "aws_caller_identity" "current" {}
 terraform {
-  backend "s3" {} 
+  backend "s3" {}
 }
 locals {
   name_prefix = "${var.common_tags.owner}-${var.common_tags.app_name}"
 }
 
 module "network" {
-  source             = "./modules/network"
-  name_prefix        = local.name_prefix
-  vpc_cidrs          = var.vpc_cidrs
-  ha                 = var.ha
+  source      = "./modules/network"
+  name_prefix = local.name_prefix
+  vpc_cidrs   = var.vpc_cidrs
+  ha          = var.ha
   # common_tags        = var.common_tags
 }
 
 module "eks" {
-  source          = "terraform-aws-modules/eks/aws"
-  version         = "~> 20.31"
-  cluster_name    = "${var.common_tags.owner}-cluster"
-  cluster_version = var.cluster_version
-  subnet_ids     = module.network.subnet_ids
-  vpc_id          = module.network.vpc_id
-  cluster_endpoint_public_access  = true
-  enable_cluster_creator_admin_permissions = true 
-  authentication_mode = "API_AND_CONFIG_MAP"
-  tags = var.common_tags
-  access_entries = {
+  source                                   = "terraform-aws-modules/eks/aws"
+  version                                  = "20.37.2" # pinned: the version this setup was proven with
+  cluster_name                             = "${var.common_tags.owner}-cluster"
+  cluster_version                          = var.cluster_version
+  subnet_ids                               = module.network.subnet_ids
+  vpc_id                                   = module.network.vpc_id
+  cluster_endpoint_public_access           = true
+  enable_cluster_creator_admin_permissions = true
+  authentication_mode                      = "API_AND_CONFIG_MAP"
+  tags                                     = var.common_tags
+  access_entries = var.enable_github_actions_access ? {
     github_actions = {
-      principal_arn     = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.github_actions_role_name}"
+      principal_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.github_actions_role_name}"
       policy_associations = {
         admin = {
           policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
@@ -37,7 +37,7 @@ module "eks" {
         }
       }
     }
-  }
+  } : {}
   cluster_security_group_additional_rules = {
     ingress_github_actions = {
       description = "Allow GitHub Actions to reach API Server"
@@ -48,14 +48,14 @@ module "eks" {
       cidr_blocks = var.allowed_cidr_blocks
     }
   }
-  
+
   eks_managed_node_groups = {
     main = {
-      name         = "${var.common_tags.owner}-eks-node"
-      capacity_type   = "ON_DEMAND"
-      desired_size = 2
-      max_size     = 3
-      min_size     = 1
+      name           = "${var.common_tags.owner}-eks-node"
+      capacity_type  = "ON_DEMAND"
+      desired_size   = 2
+      max_size       = 3
+      min_size       = 1
       instance_types = [var.node_type]
     }
   }
@@ -63,8 +63,8 @@ module "eks" {
 
 
 module "eks_blueprints_addons" {
-  source = "aws-ia/eks-blueprints-addons/aws"
-  version = "~> 1.0"
+  source  = "aws-ia/eks-blueprints-addons/aws"
+  version = "1.23.0" # pinned: newer 1.x needs Helm provider 3
 
   cluster_name      = module.eks.cluster_name
   cluster_endpoint  = module.eks.cluster_endpoint
@@ -73,7 +73,7 @@ module "eks_blueprints_addons" {
 
   eks_addons = {
     aws-ebs-csi-driver = {
-      most_recent = true
+      most_recent              = true
       service_account_role_arn = module.ebs_csi_irsa_role.iam_role_arn
     }
     coredns = {
@@ -86,17 +86,17 @@ module "eks_blueprints_addons" {
       most_recent = true
     }
   }
-  
-  enable_aws_load_balancer_controller = true  
-  enable_external_secrets = true 
+
+  enable_aws_load_balancer_controller = true
+  enable_external_secrets             = true
   external_secrets = {
     service_account_role_arn = module.external_secrets_irsa_role.iam_role_arn
   }
 }
 
 module "ebs_csi_irsa_role" {
-  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version = "5.30.0"
+  source                = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version               = "5.30.0"
   role_name             = "${local.name_prefix}-ebs-csi"
   attach_ebs_csi_policy = true
   tags                  = var.common_tags

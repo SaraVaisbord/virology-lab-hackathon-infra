@@ -23,7 +23,7 @@ resource "aws_internet_gateway" "this" {
   vpc_id = aws_vpc.this.id
   tags = {
     Name = "${var.name_prefix}-IGW"
-  }  
+  }
 }
 
 resource "aws_route_table" "internet" {
@@ -35,11 +35,11 @@ resource "aws_route_table" "internet" {
   }
   tags = {
     Name = "${var.name_prefix}-RTB"
-  }  
+  }
 }
 
 resource "aws_subnet" "this" {
-  count                   = local.total
+  count = local.total
 
   vpc_id                  = aws_vpc.this.id
   map_public_ip_on_launch = true
@@ -47,11 +47,24 @@ resource "aws_subnet" "this" {
   availability_zone       = data.aws_availability_zones.available.names[count.index]
   tags = {
     Name = "${var.name_prefix}-SUBNET-${count.index}"
-  }  
+  }
 }
 
 resource "aws_route_table_association" "this" {
   count          = local.total
   subnet_id      = aws_subnet.this[count.index].id
   route_table_id = aws_route_table.internet.id
+}
+
+####### Private subnets — the database only. No internet route: reachable only from inside the VPC. #######
+
+resource "aws_subnet" "private" {
+  count = max(local.total, 2) # an RDS subnet group needs two availability zones
+
+  vpc_id            = aws_vpc.this.id
+  cidr_block        = cidrsubnet(var.vpc_cidrs, 8, 100 + count.index)
+  availability_zone = data.aws_availability_zones.available.names[count.index]
+  tags = {
+    Name = "${var.name_prefix}-PRIVATE-SUBNET-${count.index}"
+  }
 }

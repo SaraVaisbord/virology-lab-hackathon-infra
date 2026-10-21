@@ -1,42 +1,29 @@
 # תשתית AWS – מערכת אימות טפסי התחייבות (המעבדה המרכזית לנגיפים)
 
-Terraform שמקים את התשתית להרצת [virology-lab-hackathon-app](https://github.com/SaraVaisbord/virology-lab-hackathon-app) על AWS EKS. קובצי ה-Kubernetes של האפליקציה נמצאים ב-[virology-lab-hackathon-k8s](https://github.com/SaraVaisbord/virology-lab-hackathon-k8s).
-
-> **סטטוס:** הקוד הועתק מתשתית קיימת ועדיין **מותאם** לאפליקציה הזו – ראו "מה נשאר להתאים" למטה.
+Terraform שמקים את כל התשתית להרצת [virology-lab-hackathon-app](https://github.com/SaraVaisbord/virology-lab-hackathon-app) על AWS. הפריסה של האפליקציה עצמה נמצאת ב-[virology-lab-hackathon-k8s](https://github.com/SaraVaisbord/virology-lab-hackathon-k8s).
 
 ## מה מוקם
 
-| רכיב | פירוט |
-|---|---|
-| רשת (VPC) | תתי-רשת ציבוריות בכמה אזורי זמינות (`ha`), Internet Gateway |
-| אשכול EKS | Kubernetes 1.31, קבוצת שרתים מנוהלת (1–3, ברירת מחדל 2, `t3a.medium`) |
-| אחסון | EBS CSI driver ו-StorageClass מסוג gp3 כברירת מחדל |
-| כניסה מהאינטרנט | AWS Load Balancer Controller (ALB) |
-| סודות | External Secrets Operator, קורא מ-AWS Secrets Manager רק סודות תחת `<owner>-<app_name>/*` |
-| גיבוי | AWS Backup – גיבוי יומי ב-02:00, שמירה ל-7 ימים, לפי התגית `owner` |
-| מצב Terraform | S3 + נעילה ב-DynamoDB (`backend.hcl`) |
-
-## מבנה
-
-```
-MAIN.tf              רשת, EKS, תוספים, הרשאות IRSA
-providers.tf         AWS, Kubernetes, Helm
-variables.tf         משתנים
-outputs.tf           כתובת האשכול ופקודת החיבור
-backup.tf            AWS Backup
-backend.hcl          מיקום קובץ המצב (S3)
-modules/network/     VPC, תתי-רשת, ניתוב
-modules/ebs-csi-storageclass/  StorageClass מסוג gp3
-```
+| רכיב | פירוט | קובץ |
+|---|---|---|
+| רשת (VPC) | תתי-רשת ציבוריות לאשכול, ותתי-רשת **פרטיות בלי גישה לאינטרנט** למסד הנתונים | `modules/network` |
+| אשכול EKS | Kubernetes 1.31, 2 שרתים (`t3a.large`, אפשר 1–3) | `MAIN.tf` |
+| תוספים | EBS CSI (דיסקים מוצפנים), Load Balancer Controller, External Secrets | `MAIN.tf` |
+| **מסד נתונים** | **RDS PostgreSQL 16 – שרת נפרד**, בתת-רשת פרטית, נגיש רק מהאשכול, מוצפן. גיבוי אוטומטי יומי ל-7 ימים + שחזור לכל רגע בתקופה, snapshot סופי במחיקה, הגנה ממחיקה. אופציה: שרת גיבוי חם באזור אחר (`db_multi_az`) | `app.tf` |
+| **קבצים ותמונות** | **באקט S3 פרטי** – חסום לגישה ציבורית, מוצפן, גרסאות (אפשר לשחזר קובץ שנמחק), רק HTTPS | `app.tf` |
+| הרשאות | ל-backend יש IAM role (IRSA) שמורשה **רק** לבאקט הזה | `app.tf` |
+| תמונות האפליקציה | שני מאגרי ECR (backend, frontend), סריקת אבטחה בכל דחיפה | `app.tf` |
+| סודות | Secrets Manager: חיבור למסד (נוצר אוטומטית) ומפתחות Gemini (מוכנסים ידנית) | `app.tf` |
+| גיבוי נוסף | AWS Backup – גיבוי יומי ל-7 ימים של כל המשאבים המתויגים | `backup.tf` |
+| מצב Terraform | S3 + נעילה ב-DynamoDB, במפתח נפרד מכל תשתית אחרת | `backend.hcl` |
 
 ## הרצה
 
 ```bash
 aws sso login
 terraform init -backend-config=backend.hcl
-terraform plan -out tfplan          # נדרש terraform.tfvars – ראו למטה
-terraform apply tfplan
-aws eks update-kubeconfig --region <region> --name <owner>-cluster
+terraform plan -out tfplan
+terraform apply tfplan      # ~20-25 דקות (האשכול והמסד)
 ```
 
 `terraform.tfvars` (לא נשמר ב-Git):
@@ -52,16 +39,22 @@ region          = "us-east-1"
 vpc_cidrs       = "10.0.0.0/16"
 ha              = 2
 cluster_version = "1.31"
-node_type       = "t3a.large"   # OCR ועיבוד תמונה צריכים יותר זיכרון
+node_type       = "t3a.large"
 ```
 
-## מה נשאר להתאים
+אחרי ההקמה – מפתחות Gemini לסוד (הערכים לא עוברים דרך Terraform או Git):
 
-- [ ] **מאגרי ECR** לאימג'ים של השרת והממשק.
-- [ ] **סוד ב-Secrets Manager** למפתחות Gemini, תחת `<owner>-<app_name>/`.
-- [ ] **הצפנת דיסקים** – `encrypted = true` ב-`modules/ebs-csi-storageclass` (כרגע בהערה).
-- [ ] **גיבוי הדיסק של האפליקציה** – לתייג את הדיסק ב-`owner`, אחרת AWS Backup לא כולל אותו.
-- [ ] **הגבלת גישה** – `allowed_cidr_blocks` פתוח כרגע ל-`0.0.0.0/0`.
-- [ ] בהמשך: RDS PostgreSQL למסד הנתונים ו-S3 לתמונות, במקום דיסק אחד.
+```bash
+aws secretsmanager put-secret-value --secret-id virology-lab-forms-validation/gemini \
+  --secret-string '{"GEMINI_API_KEY":"...","GEMINI_API_KEY_2":"..."}'
+```
 
-קובץ המצב נשמר תחת המפתח `virology-lab-hackathon/eks/terraform.tfstate` – נפרד מכל תשתית אחרת באותו bucket.
+ואז הפריסה: `deploy.ps1` ב-[virology-lab-hackathon-k8s](https://github.com/SaraVaisbord/virology-lab-hackathon-k8s).
+
+## פירוק
+
+המסד מוגן ממחיקה והבאקט לא נמחק כשיש בו קבצים. כדי לפרק הכול: `db_deletion_protection = false` ו-`files_bucket_force_destroy = true`, `terraform apply`, ואז `terraform destroy`. במחיקה נשמר snapshot סופי של המסד.
+
+## עלות משוערת (us-east-1)
+
+אשכול EKS + 2 שרתים + ALB + RDS קטן: כ-0.35$ לשעה (בערך 8$ ליום).
