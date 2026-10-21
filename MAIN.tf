@@ -53,10 +53,13 @@ module "eks" {
     main = {
       name           = "${var.common_tags.owner}-eks-node"
       capacity_type  = "ON_DEMAND"
-      desired_size   = 2
-      max_size       = 3
+      desired_size   = var.node_count
+      max_size       = var.node_count # a new account allows only 5 vCPUs: never more than this many nodes
       min_size       = 1
       instance_types = [var.node_type]
+      update_config = {
+        max_unavailable = 1 # replace nodes one by one instead of adding extra ones during updates
+      }
     }
   }
 }

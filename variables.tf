@@ -69,6 +69,12 @@ variable "node_type" {
   type = string
 }
 
+variable "node_count" {
+  description = "Worker nodes (also the maximum). node_count x vCPUs of node_type must fit the account's EC2 vCPU quota."
+  type        = number
+  default     = 2
+}
+
 variable "github_actions_role_name" {
   type    = string
   default = "GitHubActions-CICD-Role"

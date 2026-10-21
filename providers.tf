@@ -20,9 +20,7 @@ terraform {
 
 
 }
-data "aws_eks_cluster" "cluster" {
-  name = module.eks.cluster_name
-}
+
 provider "aws" {
   region = var.region
 
