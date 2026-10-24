@@ -40,3 +40,22 @@ output "secret_names" {
     gemini = aws_secretsmanager_secret.gemini.name
   }
 }
+
+# ── the public address (dns.tf) ──
+
+output "domain_name" {
+  value = var.domain_name
+}
+
+output "name_servers" {
+  description = "Put these four as the domain's nameservers at the registrar"
+  value       = data.aws_route53_zone.main.name_servers
+}
+
+output "hosted_zone_id" {
+  value = data.aws_route53_zone.main.zone_id
+}
+
+output "certificate_arn" {
+  value = aws_acm_certificate_validation.main.certificate_arn
+}

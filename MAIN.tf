@@ -94,6 +94,9 @@ module "eks_blueprints_addons" {
   enable_external_secrets             = true
   external_secrets = {
     service_account_role_arn = module.external_secrets_irsa_role.iam_role_arn
+    # The chart's CRDs make Helm download the whole cluster OpenAPI schema first, which times out on a slow
+    # connection ("failed to download openapi"). The API server still validates every object on create.
+    disable_openapi_validation = true
   }
 }
 

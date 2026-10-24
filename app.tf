@@ -129,6 +129,12 @@ resource "random_password" "db" {
   special = false # goes into a connection URL
 }
 
+# Each environment's final snapshot gets its own name; a fixed name already taken by an earlier teardown's
+# snapshot makes the next `terraform destroy` fail on the database.
+resource "random_id" "db_final_snapshot" {
+  byte_length = 3
+}
+
 resource "aws_db_subnet_group" "app" {
   name       = "${local.name_prefix}-db"
   subnet_ids = module.network.private_subnet_ids
@@ -180,7 +186,7 @@ resource "aws_db_instance" "app" {
   maintenance_window        = "sun:01:30-sun:02:30"
   copy_tags_to_snapshot     = true
   skip_final_snapshot       = false
-  final_snapshot_identifier = "${local.name_prefix}-db-final"
+  final_snapshot_identifier = "${local.name_prefix}-db-final-${random_id.db_final_snapshot.hex}"
   deletion_protection       = var.db_deletion_protection
   apply_immediately         = true
 
